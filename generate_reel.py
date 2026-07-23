@@ -706,19 +706,29 @@ def generate_full_reel(quote_text=DEFAULT_QUOTE):
     if not segments:
         segments, total_audio_duration = align_clauses_to_audio(master_audio_file, clauses)
         
-    # Generate ElevenLabs Soft Spiritual Ambient Sound Effect for depth
+    # Load and process Background Music (Heartbreaking Piano)
     bg_audio_clip = None
-    if eleven_key:
-        sound_res = generate_background_sound_elevenlabs(bg_sound_file, total_audio_duration, eleven_key)
-        if sound_res and os.path.exists(sound_res):
-            try:
-                bg_audio = AudioFileClip(bg_sound_file)
-                if bg_audio.duration < total_audio_duration:
-                    bg_audio = bg_audio.with_duration(total_audio_duration)
-                # Lower volume to 15% so whisper narration remains crisp, peaceful, and prominent
-                bg_audio_clip = bg_audio.with_effects([lambda clip: clip.with_volume_scaling(0.15)]).with_duration(total_audio_duration)
-            except Exception as e:
-                print(f"Background audio blend note: {e}")
+    bg_music_path = getattr(cfg, "BG_MUSIC_FILE", os.path.join(WORKSPACE_DIR, "assets", "music", "heartbreaking_piano.mp3"))
+    if not os.path.exists(bg_music_path):
+        bg_music_path = os.path.join(WORKSPACE_DIR, "assets", "music", "heartbreaking_piano.mp3")
+
+    if os.path.exists(bg_music_path):
+        try:
+            print(f"\nAdding Background Music ({os.path.basename(bg_music_path)})...")
+            from moviepy.audio.fx import AudioFadeOut, MultiplyVolume
+            bg_music = AudioFileClip(bg_music_path)
+            if bg_music.duration < total_audio_duration:
+                from moviepy import concatenate_audioclips
+                n_loops = int(np.ceil(total_audio_duration / bg_music.duration))
+                bg_music = concatenate_audioclips([bg_music] * n_loops)
+            
+            bg_music_sub = bg_music.subclipped(0, total_audio_duration)
+            vol = getattr(cfg, "BG_MUSIC_VOLUME", 0.12)
+            fade = getattr(cfg, "BG_MUSIC_FADEOUT_SEC", 1.5)
+            bg_audio_clip = bg_music_sub.with_effects([MultiplyVolume(vol), AudioFadeOut(fade)])
+            print(f"  - Background music composited ({vol*100:.0f}% volume, {fade}s fadeout).")
+        except Exception as e:
+            print(f"  - Background music note ({e}).")
 
     # Build Master Audio Stream
     voice_clip = AudioFileClip(master_audio_file)
