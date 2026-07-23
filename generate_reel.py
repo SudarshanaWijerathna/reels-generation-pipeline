@@ -63,7 +63,7 @@ def generate_full_audio_gemini_tts(quote_text, output_audio, api_key):
     Generates high quality spiritual audio using Google Gemini 3.1 Flash TTS (Preview) with voice 'Algenib'.
     """
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent?key={api_key}"
-    style_instruction = "Sensual Hypnosis - Sensual, Seductive, Gentle, Spiritual, Charming voice. Suitable for ASMR, Guided Meditation and Hypnosis Inductions. Self realizing tone, with breadth between clauses"
+    style_instruction = cfg.GEMINI_TTS_STYLE
     
     full_prompt = f"Please read this quote following this style instruction: ({style_instruction}).\n\nQuote: {quote_text}"
     
@@ -665,7 +665,7 @@ def generate_full_reel(quote_text=DEFAULT_QUOTE):
     alignment_data = None
     audio_result = None
     
-    # Primary TTS: Google Gemini 3.1 Flash TTS (Preview) - Voice Algenib with Sensual Hypnosis Style
+    # Primary TTS: Google Gemini 3.1 Flash TTS (Preview) - Voice Algenib with Wounded Sage Style
     if gemini_key:
         audio_result = generate_full_audio_gemini_tts(quote_text, master_audio_file, gemini_key)
         if audio_result and os.path.exists(audio_result):

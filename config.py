@@ -62,9 +62,12 @@ class PipelineConfig:
     # ── TTS Voice Settings ─────────────────────────────────────────────────
     GEMINI_TTS_VOICE:  str = "Algenib"
     GEMINI_TTS_STYLE:  str = (
-        "Sensual Hypnosis - Sensual, Seductive, Gentle, Spiritual, Charming voice. "
-        "Suitable for ASMR, Guided Meditation and Hypnosis Inductions. "
-        "Self realizing tone, with breadth between clauses"
+        "A mature, resonant voice (in their late 30s to 50s) speaking in a slow, deliberate, and intimate tone. "
+        "The character is a 'Wounded Sage'—someone who has experienced deep pain but speaks with calm, stoic wisdom "
+        "and gentle acceptance rather than anger. The pacing should be measured, with intentional, breathy pauses "
+        "before delivering philosophical truths. The voice should have a slight, cinematic rasp, sounding close "
+        "to the microphone as if reading a highly personal letter or narrating a profound, late-night realization. "
+        "Keep the emotional delivery melancholic, warm, and highly reflective."
     )
     EDGE_TTS_VOICE:    str = "en-US-ChristopherNeural"
     EDGE_TTS_RATE:     str = "-25%"
