@@ -203,7 +203,7 @@ def generate_full_audio_edgetts(quote_text, output_mp3):
     print("Generated Edge-TTS spiritual fallback voiceover:", output_mp3)
     return output_mp3
 
-def _subdivide_long_clause(text, max_words=7):
+def _subdivide_long_clause(text, max_words=8):
     words = text.split()
     if len(words) <= max_words:
         return [text]
@@ -223,7 +223,7 @@ def _subdivide_long_clause(text, max_words=7):
 def parse_quote_into_clauses(quote_text):
     """
     Splits a quote into individual clauses based on punctuation.
-    Subdivides any clause exceeding 7 words to ensure 1-2 line subtitle cards.
+    Subdivides any clause exceeding 8 words to ensure 1-2 line subtitle cards.
     """
     raw_clauses = re.split(r'([,\.\;\!\?])', quote_text)
     raw_list = []
@@ -242,10 +242,10 @@ def parse_quote_into_clauses(quote_text):
     if current_text.strip():
         raw_list.append({"text": current_text.strip(), "delay": 1.8, "punctuation": "."})
 
-    # Subdivide any clause over 7 words
+    # Subdivide any clause over 8 words
     clauses = []
     for item in raw_list:
-        sub_texts = _subdivide_long_clause(item["text"], max_words=7)
+        sub_texts = _subdivide_long_clause(item["text"], max_words=8)
         for i, st in enumerate(sub_texts):
             is_last = (i == len(sub_texts) - 1)
             clauses.append({
