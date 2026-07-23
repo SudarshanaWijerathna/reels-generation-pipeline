@@ -87,7 +87,7 @@ class PipelineConfig:
 
     # ── Quote Engine ───────────────────────────────────────────────────────
     QUOTE_FEW_SHOT_SAMPLES: int = 12       # How many dataset quotes to include as examples
-    QUOTE_MODEL_GEMINI:     str = "gemini-2.0-flash"
+    QUOTE_MODEL_GEMINI:     str = "gemini-flash-latest"
     QUOTE_MODEL_GROQ:       str = "llama3-70b-8192"
 
     # ── API Keys ───────────────────────────────────────────────────────────

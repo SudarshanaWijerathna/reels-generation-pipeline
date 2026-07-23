@@ -434,8 +434,8 @@ Input clauses:
 
 Return your response as a JSON array of strings, where each element is the image prompt for the clause at that index. Do not add any markdown formatting (like ```json) outside the JSON. Return only valid JSON."""
 
-    # Using gemini-2.0-flash as configured in config.py
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    # Using gemini-flash-latest as configured in config.py
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
