@@ -29,9 +29,13 @@ Documentation:
 from __future__ import annotations
 
 import os
+import sys
 import requests
 
 from config import cfg
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 
 GRAPH_API_VERSION = "v22.0"
@@ -126,7 +130,7 @@ def _upload_video_binary(upload_url: str, token: str, video_path: str) -> bool:
     }
     print(f"  [FB] Uploading {file_size / 1024 / 1024:.1f} MB to upload URL...")
     with open(video_path, "rb") as f:
-        r = requests.put(upload_url, headers=headers, data=f, timeout=300)
+        r = requests.post(upload_url, headers=headers, data=f, timeout=300)
     if r.status_code not in (200, 201):
         raise RuntimeError(f"FB upload binary failed [{r.status_code}]: {r.text}")
     print(f"  [FB] Binary upload complete.")
