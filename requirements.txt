@@ -1,0 +1,10 @@
+requests
+numpy
+pillow
+python-dotenv
+imageio-ffmpeg
+edge-tts
+librosa
+moviepy
+resvg-py
+fonttools
