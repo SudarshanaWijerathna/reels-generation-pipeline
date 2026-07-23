@@ -42,7 +42,8 @@ def load_dataset_quotes(n: int = 15) -> list[str]:
     """
     Extracts real quotes from facebook_reels_transcripts.md.
     Skips [Music / Background Sound] entries.
-    Returns `n` randomly sampled quotes as a list of strings.
+    Returns `n` quotes sorted longest-first so the richest examples
+    always appear at the top of the few-shot prompt.
     """
     path = cfg.TRANSCRIPTS_FILE
     if not os.path.exists(path):
@@ -52,28 +53,25 @@ def load_dataset_quotes(n: int = 15) -> list[str]:
     with open(path, "r", encoding="utf-8", errors="replace") as f:
         content = f.read()
 
-    # Extract quote blocks — lines starting with > or under "**Full Quote**:"
+    # Extract quote blocks — lines starting with >
     quotes = []
-    # Match "**Full Quote**:\n> ..." blocks
-    blocks = re.findall(r'\*\*Full Quote\*\*:\s*\n(.*?)(?=\n---|\Z)', content, re.DOTALL)
-    for block in blocks:
-        # Strip leading "> " from each line
-        lines = [re.sub(r'^>\s*', '', line).strip() for line in block.strip().splitlines()]
-        text = " ".join(l for l in lines if l)
-        if text and "[Music" not in text and len(text) > 60:
-            quotes.append(text)
-
-    if not quotes:
-        # Fallback: extract from TOC summary lines
-        toc_lines = re.findall(r'\*"([^"]{60,}?)\.?\.\."?\*', content)
-        quotes = [q.strip() for q in toc_lines if "[Music" not in q]
+    for line in content.splitlines():
+        if line.strip().startswith(">"):
+            text = re.sub(r'^>\s*', '', line).strip()
+            if text and "[Music" not in text and len(text) > 60:
+                quotes.append(text)
 
     if not quotes:
         print("  [WARN] Could not extract quotes from transcripts — using built-in examples.")
         quotes = _FALLBACK_EXAMPLES
 
-    sample_size = min(n, len(quotes))
-    return random.sample(quotes, sample_size)
+    # Sort by word count descending so longest (richest) quotes appear first
+    quotes.sort(key=lambda q: len(q.split()), reverse=True)
+
+    # Sample from the top half (richest) to bias toward longer outputs
+    rich_pool = quotes[:max(n * 2, len(quotes) // 2)]
+    sample_size = min(n, len(rich_pool))
+    return random.sample(rich_pool, sample_size)
 
 
 _FALLBACK_EXAMPLES = [
@@ -104,19 +102,21 @@ def _build_prompt(examples: list[str], theme: str = "") -> str:
 Your task is to write ONE new original philosophical quote in the exact same voice, tone, and structure as the examples below.{theme_instruction}
 
 STYLE RULES (follow strictly):
-- 3 to 7 short clauses separated by commas or periods
+- MINIMUM 5 clauses, maximum 7 — do not stop early
 - Each clause: 5–15 words, direct and punchy
 - Tone: introspective, melancholic, wise, universal
 - Person: "you", "I", or universal third-person
 - NO rhyming forced
 - NO hashtags, NO emojis, NO author attribution
-- End with a powerful one-line conclusion
-- Output ONLY the quote text. Nothing else.
+- Build tension across the clauses — escalate the feeling
+- End with a powerful, memorable one-line conclusion
+- Total length: 50–90 words
+- Output ONLY the quote text. Nothing else. No preamble, no commentary.
 
-REFERENCE EXAMPLES from the Whisprs dataset:
+REFERENCE EXAMPLES from the Whisprs dataset (study their length and depth):
 {examples_text}
 
-Now write ONE new original quote in exactly this style. Output only the quote text:"""
+Now write ONE new original quote following all the rules above. It must have at least 5 clauses and at least 50 words. Output only the quote text:"""
 
 
 # ---------------------------------------------------------------------------
@@ -133,7 +133,7 @@ def _generate_via_gemini(prompt: str) -> str | None:
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "temperature": 0.85,
-            "maxOutputTokens": 300,
+            "maxOutputTokens": 600,
             "topP": 0.95,
         }
     }
@@ -204,25 +204,42 @@ def generate_quote(theme: str = "") -> str:
     Returns:
         Quote string.
     """
+    MIN_WORDS   = 50   # Reject quotes shorter than this
+    MIN_CLAUSES = 4    # Reject quotes with fewer clause-break punctuation marks
+    MAX_RETRIES = 3
+
     print("\nLoading Whisprs dataset examples for few-shot prompting...")
     examples = load_dataset_quotes(n=cfg.QUOTE_FEW_SHOT_SAMPLES)
     print(f"  Loaded {len(examples)} reference quotes.")
 
     prompt = _build_prompt(examples, theme=theme)
 
-    print("\nGenerating quote via Gemini Flash (primary)...")
-    quote = _generate_via_gemini(prompt)
+    quote = None
+    for attempt in range(1, MAX_RETRIES + 1):
+        print(f"\nGenerating quote via Gemini Flash (attempt {attempt}/{MAX_RETRIES})...")
+        candidate = _generate_via_gemini(prompt)
+
+        if not candidate:
+            print("  Gemini unavailable — trying Groq fallback...")
+            candidate = _generate_via_groq(prompt)
+
+        if candidate:
+            candidate = candidate.strip().strip('"').strip("'").strip()
+            word_count   = len(candidate.split())
+            clause_count = len(re.findall(r'[.,;!?]', candidate))
+            if word_count >= MIN_WORDS and clause_count >= MIN_CLAUSES:
+                quote = candidate
+                if attempt > 1:
+                    print(f"  [Quality] Accepted on attempt {attempt} ({word_count} words, {clause_count} clauses).")
+                break
+            else:
+                print(f"  [Quality] Rejected attempt {attempt}: {word_count} words, {clause_count} clauses — retrying for richer output...")
 
     if not quote:
-        print("\nFalling back to Groq Llama 3 70B...")
-        quote = _generate_via_groq(prompt)
+        print("\n  All attempts yielded short quotes — using a rich dataset quote as fallback.")
+        # Pick the longest available example as fallback
+        quote = max(examples or _FALLBACK_EXAMPLES, key=lambda q: len(q.split()))
 
-    if not quote:
-        print("\n  Both LLMs unavailable — using random dataset quote as fallback.")
-        quote = random.choice(examples or _FALLBACK_EXAMPLES)
-
-    # Clean up: strip surrounding quotes if LLM added them
-    quote = quote.strip().strip('"').strip("'").strip()
     return quote
 
 
