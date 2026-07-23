@@ -11,6 +11,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 # Hand-drawn boil animation subtitle system
+from config import cfg
 from subtitle_boil import create_animated_subtitle_clip, boil_animate_svg_asset, cleanup_boil_frames
 
 # Ensure FFmpeg is in PATH
