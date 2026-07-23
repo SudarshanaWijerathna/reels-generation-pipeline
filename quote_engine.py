@@ -102,21 +102,21 @@ def _build_prompt(examples: list[str], theme: str = "") -> str:
 Your task is to write ONE new original philosophical quote in the exact same voice, tone, and structure as the examples below.{theme_instruction}
 
 STYLE RULES (follow strictly):
-- MINIMUM 5 clauses, maximum 7 — do not stop early
-- Each clause: 5–15 words, direct and punchy
+- MINIMUM 5 clauses, maximum 8 — split thoughts into short, punchy fragments
+- Each clause: 3–7 words ONLY (VERY SHORT clauses, e.g., "You walked away without goodbye", "leaving me beneath a silent sky")
 - Tone: introspective, melancholic, wise, universal
 - Person: "you", "I", or universal third-person
 - NO rhyming forced
 - NO hashtags, NO emojis, NO author attribution
 - Build tension across the clauses — escalate the feeling
 - End with a powerful, memorable one-line conclusion
-- Total length: 50–90 words
+- Total length: 40–80 words
 - Output ONLY the quote text. Nothing else. No preamble, no commentary.
 
 REFERENCE EXAMPLES from the Whisprs dataset (study their length and depth):
 {examples_text}
 
-Now write ONE new original quote following all the rules above. It must have at least 5 clauses and at least 50 words. Output only the quote text:"""
+Now write ONE new original quote following all the rules above. Keep clauses short (3 to 7 words each). Output only the quote text:"""
 
 
 # ---------------------------------------------------------------------------

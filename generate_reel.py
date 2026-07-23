@@ -203,29 +203,56 @@ def generate_full_audio_edgetts(quote_text, output_mp3):
     print("Generated Edge-TTS spiritual fallback voiceover:", output_mp3)
     return output_mp3
 
+def _subdivide_long_clause(text, max_words=7):
+    words = text.split()
+    if len(words) <= max_words:
+        return [text]
+    conjunctions = ['because', 'and', 'but', 'so', 'when', 'which', 'that', 'while', 'where', 'yet', 'as']
+    for conj in conjunctions:
+        pattern = r'\b' + conj + r'\b'
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            idx = match.start()
+            part1 = text[:idx].strip()
+            part2 = text[idx:].strip()
+            if part1 and part2 and len(part1.split()) <= max_words and len(part2.split()) <= max_words:
+                return [part1, part2]
+    mid = len(words) // 2
+    return [' '.join(words[:mid]), ' '.join(words[mid:])]
+
 def parse_quote_into_clauses(quote_text):
     """
     Splits a quote into individual clauses based on punctuation.
-    Assigns extended silence delays for spiritual, satisfying pacing:
-    - Commas/semicolons: 1.2s delay
-    - Periods/exclamations: 2.0s delay
+    Subdivides any clause exceeding 7 words to ensure 1-2 line subtitle cards.
     """
     raw_clauses = re.split(r'([,\.\;\!\?])', quote_text)
-    clauses = []
+    raw_list = []
     current_text = ""
     for token in raw_clauses:
         if token in [',', ';']:
             if current_text.strip():
-                clauses.append({"text": current_text.strip(), "delay": 1.2, "punctuation": token})
+                raw_list.append({"text": current_text.strip(), "delay": 1.2, "punctuation": token})
                 current_text = ""
         elif token in ['.', '!', '?']:
             if current_text.strip():
-                clauses.append({"text": current_text.strip(), "delay": 2.0, "punctuation": token})
+                raw_list.append({"text": current_text.strip(), "delay": 2.0, "punctuation": token})
                 current_text = ""
         else:
             current_text += token
     if current_text.strip():
-        clauses.append({"text": current_text.strip(), "delay": 1.8, "punctuation": "."})
+        raw_list.append({"text": current_text.strip(), "delay": 1.8, "punctuation": "."})
+
+    # Subdivide any clause over 7 words
+    clauses = []
+    for item in raw_list:
+        sub_texts = _subdivide_long_clause(item["text"], max_words=7)
+        for i, st in enumerate(sub_texts):
+            is_last = (i == len(sub_texts) - 1)
+            clauses.append({
+                "text": st,
+                "delay": item["delay"] if is_last else 0.8,
+                "punctuation": item["punctuation"] if is_last else ""
+            })
     return clauses
 
 def align_clauses_with_elevenlabs_alignment(quote_text, clauses, alignment, total_duration):
@@ -666,7 +693,7 @@ def generate_full_reel(quote_text=DEFAULT_QUOTE):
     alignment_data = None
     audio_result = None
     
-    # Primary TTS: Google Gemini 3.1 Flash TTS (Preview) - Voice Algenib with Wounded Sage Style
+    # Primary TTS: Google Gemini 3.1 Flash TTS (Preview) - Voice Algenib with Sensual Hypnosis Style
     if gemini_key:
         audio_result = generate_full_audio_gemini_tts(quote_text, master_audio_file, gemini_key)
         if audio_result and os.path.exists(audio_result):
