@@ -49,7 +49,7 @@ class PipelineConfig:
 
     # ── Background Music ───────────────────────────────────────────────────
     BG_MUSIC_FILE:   str = str(_ROOT / "assets" / "music" / "heartbreaking_piano.mp3")
-    BG_MUSIC_VOLUME: float = 0.12          # 12% volume
+    BG_MUSIC_VOLUME: float = 1.00          # 100% volume
     BG_MUSIC_FADEOUT_SEC: float = 1.5      # fade-out duration at end of reel
 
     # ── Image Generation ───────────────────────────────────────────────────

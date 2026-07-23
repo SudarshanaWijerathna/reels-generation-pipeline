@@ -462,26 +462,31 @@ Input clauses:
 
 Return your response as a JSON array of strings, where each element is the image prompt for the clause at that index. Do not add any markdown formatting (like ```json) outside the JSON. Return only valid JSON."""
 
-    # Using gemini-flash-latest as configured in config.py
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key={api_key}"
+    # Using cfg.QUOTE_MODEL_GEMINI (gemini-3.5-flash-lite) for reliable JSON generation
+    model_name = getattr(cfg, "QUOTE_MODEL_GEMINI", "gemini-3.5-flash-lite")
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "responseMimeType": "application/json",
             "temperature": 0.7,
-            "maxOutputTokens": 1000
+            "maxOutputTokens": 2000
         }
     }
     
     try:
-        r = requests.post(url, json=payload, timeout=20)
+        r = requests.post(url, json=payload, timeout=25)
         if r.status_code == 200:
             data = r.json()
             candidates = data.get("candidates", [])
             if candidates:
                 parts = candidates[0].get("content", {}).get("parts", [])
                 text = "".join(p.get("text", "") for p in parts).strip()
-                prompts = json.loads(text)
+                # Strip markdown json codeblock fences if returned
+                if text.startswith("```"):
+                    text = re.sub(r"^```(?:json)?\s*", "", text)
+                    text = re.sub(r"\s*```$", "", text)
+                prompts = json.loads(text.strip())
                 if isinstance(prompts, list) and len(prompts) == len(clauses):
                     return prompts
         else:
@@ -671,20 +676,22 @@ def create_subtitle_image(text, output_png, width=720, height=1280):
     img.save(output_png, "PNG")
     return output_png
 
-def generate_full_reel(quote_text=DEFAULT_QUOTE):
+def generate_full_reel(quote_text=DEFAULT_QUOTE, reuse_assets=False):
     print(f"\n=======================================================")
     print(f"STARTING REEL GENERATION (SPIRITUAL WHISPER + Extended Pauses)")
     print(f"=======================================================\n")
     print("Quote Input:\n", quote_text)
     
-    # Clean temp build directory before new reel generation
-    for f in os.listdir(TEMP_DIR):
-        f_path = os.path.join(TEMP_DIR, f)
-        if os.path.isfile(f_path):
-            try: os.remove(f_path)
-            except: pass
+    # Clean temp build directory before new reel generation unless reusing assets
+    if not reuse_assets:
+        for f in os.listdir(TEMP_DIR):
+            f_path = os.path.join(TEMP_DIR, f)
+            if os.path.isfile(f_path):
+                try: os.remove(f_path)
+                except: pass
             
     master_audio_file = os.path.join(TEMP_DIR, "master_narration.mp3")
+    master_wav = os.path.join(TEMP_DIR, "master_narration.wav")
     bg_sound_file = os.path.join(TEMP_DIR, "bg_ambient.mp3")
     
     gemini_key = os.environ.get("GEMINI_API_KEY", DEFAULT_GEMINI_API_KEY)
@@ -693,20 +700,29 @@ def generate_full_reel(quote_text=DEFAULT_QUOTE):
     alignment_data = None
     audio_result = None
     
-    # Primary TTS: Google Gemini 3.1 Flash TTS (Preview) - Voice Algenib with Sensual Hypnosis Style
-    if gemini_key:
-        audio_result = generate_full_audio_gemini_tts(quote_text, master_audio_file, gemini_key)
-        if audio_result and os.path.exists(audio_result):
-            master_audio_file = audio_result
-            
-    # Fallback 1: ElevenLabs API
-    if not audio_result and eleven_key:
-        audio_result, alignment_data = generate_full_audio_elevenlabs(quote_text, master_audio_file, eleven_key)
-        
-    # Fallback 2: Edge-TTS
+    if reuse_assets and os.path.exists(master_wav):
+        print(f"Reusing existing narration audio: {master_wav}")
+        audio_result = master_wav
+        master_audio_file = master_wav
+    elif reuse_assets and os.path.exists(master_audio_file):
+        print(f"Reusing existing narration audio: {master_audio_file}")
+        audio_result = master_audio_file
+
     if not audio_result:
-        print("Using Edge-TTS fallback...")
-        generate_full_audio_edgetts(quote_text, master_audio_file)
+        # Primary TTS: Google Gemini 3.1 Flash TTS (Preview) - Voice Algenib with Sensual Hypnosis Style
+        if gemini_key:
+            audio_result = generate_full_audio_gemini_tts(quote_text, master_audio_file, gemini_key)
+            if audio_result and os.path.exists(audio_result):
+                master_audio_file = audio_result
+                
+        # Fallback 1: ElevenLabs API
+        if not audio_result and eleven_key:
+            audio_result, alignment_data = generate_full_audio_elevenlabs(quote_text, master_audio_file, eleven_key)
+            
+        # Fallback 2: Edge-TTS
+        if not audio_result:
+            print("Using Edge-TTS fallback...")
+            generate_full_audio_edgetts(quote_text, master_audio_file)
         
     clauses = parse_quote_into_clauses(quote_text)
     print(f"\nParsed {len(clauses)} clauses from quote.")
@@ -733,6 +749,9 @@ def generate_full_reel(quote_text=DEFAULT_QUOTE):
     if not segments:
         segments, total_audio_duration = align_clauses_to_audio(master_audio_file, clauses)
         
+    END_PADDING = 2.0  # 2.0 seconds of lingering pause after voiceover finishes
+    final_video_duration = total_audio_duration + END_PADDING
+
     # Load and process Background Music (Heartbreaking Piano)
     bg_audio_clip = None
     bg_music_path = getattr(cfg, "BG_MUSIC_FILE", os.path.join(WORKSPACE_DIR, "assets", "music", "heartbreaking_piano.mp3"))
@@ -744,16 +763,16 @@ def generate_full_reel(quote_text=DEFAULT_QUOTE):
             print(f"\nAdding Background Music ({os.path.basename(bg_music_path)})...")
             from moviepy.audio.fx import AudioFadeOut, MultiplyVolume
             bg_music = AudioFileClip(bg_music_path)
-            if bg_music.duration < total_audio_duration:
+            if bg_music.duration < final_video_duration:
                 from moviepy import concatenate_audioclips
-                n_loops = int(np.ceil(total_audio_duration / bg_music.duration))
+                n_loops = int(np.ceil(final_video_duration / bg_music.duration))
                 bg_music = concatenate_audioclips([bg_music] * n_loops)
             
-            bg_music_sub = bg_music.subclipped(0, total_audio_duration)
-            vol = getattr(cfg, "BG_MUSIC_VOLUME", 0.12)
-            fade = getattr(cfg, "BG_MUSIC_FADEOUT_SEC", 1.5)
+            bg_music_sub = bg_music.subclipped(0, final_video_duration)
+            vol = getattr(cfg, "BG_MUSIC_VOLUME", 1.00)
+            fade = getattr(cfg, "BG_MUSIC_FADEOUT_SEC", 2.0)
             bg_audio_clip = bg_music_sub.with_effects([MultiplyVolume(vol), AudioFadeOut(fade)])
-            print(f"  - Background music composited ({vol*100:.0f}% volume, {fade}s fadeout).")
+            print(f"  - Background music composited ({vol*100:.0f}% volume, {fade}s fadeout over {final_video_duration:.1f}s).")
         except Exception as e:
             print(f"  - Background music note ({e}).")
 
@@ -792,7 +811,7 @@ def generate_full_reel(quote_text=DEFAULT_QUOTE):
         end_t = seg["end"]
         
         if idx == len(segments) - 1:
-            end_t = max(end_t, total_audio_duration)
+            end_t = max(end_t, total_audio_duration) + END_PADDING
             
         dur = end_t - start_t
         if dur <= 0:
@@ -881,8 +900,10 @@ def generate_full_reel(quote_text=DEFAULT_QUOTE):
     return output_path
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        custom_quote = " ".join(sys.argv[1:])
-        generate_full_reel(custom_quote)
+    reuse = "--reuse-assets" in sys.argv
+    args = [a for a in sys.argv[1:] if a != "--reuse-assets"]
+    if args:
+        custom_quote = " ".join(args)
+        generate_full_reel(custom_quote, reuse_assets=reuse)
     else:
-        generate_full_reel()
+        generate_full_reel(reuse_assets=reuse)
