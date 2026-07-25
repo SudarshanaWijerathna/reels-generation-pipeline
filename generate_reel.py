@@ -422,13 +422,10 @@ def align_clauses_with_whisper(audio_mp3_path, clauses):
         y, sr = librosa.load(audio_mp3_path, sr=16000)
         total_dur = float(len(y) / 16000.0)
         
-        script_text = " ".join([c["text"] for c in clauses])
         model = whisper.load_model("base")
         res = model.transcribe(
-            y,
+            audio_mp3_path,
             word_timestamps=True,
-            initial_prompt=script_text,
-            condition_on_previous_text=False,
             temperature=0.0
         )
         
@@ -449,36 +446,54 @@ def align_clauses_with_whisper(audio_mp3_path, clauses):
             
         print(f"  Whisper extracted {len(all_words)} words across {total_dur:.2f}s audio.")
         
-        # Match each clause to its starting word timestamp
-        word_offset = 0
-        clause_starts = []
+        # Match each clause to its starting word timestamp sequentially
+        segments = []
+        w_idx = 0
         
         for idx, clause in enumerate(clauses):
             c_words = [re.sub(r'[^\w]', '', w).lower() for w in clause["text"].split() if re.sub(r'[^\w]', '', w)]
-            n_w = len(c_words)
+            if not c_words:
+                continue
+                
+            found_start_idx = w_idx
+            for search_i in range(w_idx, min(w_idx + 15, len(all_words))):
+                if all_words[search_i]['word'] == c_words[0] or c_words[0] in all_words[search_i]['word']:
+                    found_start_idx = search_i
+                    break
+                    
+            start_t = all_words[found_start_idx]['start']
+            w_idx = min(found_start_idx + len(c_words), len(all_words) - 1)
+            end_t = all_words[w_idx]['end']
             
-            first_w = all_words[word_offset] if word_offset < len(all_words) else all_words[-1]
-            clause_starts.append(first_w['start'])
-            word_offset += max(1, n_w)
-
-        # Build final synchronized video segments
-        segments = []
-        for i, c in enumerate(clauses):
-            st = clause_starts[i]
-            et = clause_starts[i+1] if (i + 1) < len(clause_starts) else total_dur
-            dur = round(et - st, 3)
+            if segments:
+                prev_end = segments[-1]['end']
+                if start_t < prev_end:
+                    start_t = prev_end
+                    
+            end_t = max(end_t, start_t + 0.5)
+            
             segments.append({
-                'text': c['text'],
-                'start': round(st, 3),
-                'end': round(et, 3),
-                'duration': dur
+                'text': clause['text'],
+                'start': round(start_t, 3),
+                'end': round(end_t, 3),
+                'duration': round(end_t - start_t, 3)
             })
+
+        # Adjust segment boundaries so there are no gaps or overlaps
+        for i in range(len(segments) - 1):
+            segments[i]['end'] = segments[i+1]['start']
+            segments[i]['duration'] = round(segments[i]['end'] - segments[i]['start'], 3)
+            
+        if segments:
+            segments[-1]['end'] = round(total_dur, 3)
+            segments[-1]['duration'] = round(segments[-1]['end'] - segments[-1]['start'], 3)
 
         print(f"\n  Ground-Truth Aligned Segments ({len(segments)} clauses):")
         for s in segments:
             print(f"    [{s['start']:.3f}s -> {s['end']:.3f}s] ({s['duration']:.2f}s): '{s['text']}'")
 
         return segments, total_dur
+
 
     except Exception as e:
         print(f"  Ground-truth alignment notice ({e}), falling back to simple energy split.")
@@ -664,8 +679,10 @@ def generate_clause_image(clause_text, output_jpg):
 
     clean_text = re.sub(r'[^\w\s]', '', clause_text)
     prompt = f"{clean_text}, {UNIFIED_STYLE}"
-    encoded = urllib.parse.quote(prompt)
+    clean_prompt = re.sub(r'[^a-zA-Z0-9\s,.-]', '', prompt).strip()
+    encoded = urllib.parse.quote(clean_prompt)
     seed = random.randint(1000, 99999)
+
     
     for attempt in range(4):
         try:
