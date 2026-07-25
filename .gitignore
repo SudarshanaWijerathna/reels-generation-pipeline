@@ -11,7 +11,10 @@ output_reels/
 temp_build/
 *.mp4
 !video_store/*.mp4
+!overlay_video_footages/*.mp4
 *.mp3
+!assets/music/*.mp3
+
 
 # Editor / system files
 .vscode/

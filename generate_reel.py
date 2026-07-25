@@ -178,33 +178,37 @@ def generate_full_audio_gemini_tts(quote_text, output_audio, api_key):
     
     print(f"Calling Google Gemini TTS API (Voice: {selected_voice})...")
     print(f"  Prompt Cues: '{text_with_cues[:70]}...'")
-    try:
-        r = requests.post(url, json=payload, timeout=45)
-        if r.status_code == 200:
-            data = r.json()
-            candidates = data.get("candidates", [])
-            if candidates:
-                parts = candidates[0].get("content", {}).get("parts", [])
-                for p in parts:
-                    if "inlineData" in p:
-                        b64_data = p["inlineData"]["data"]
-                        raw_pcm = base64.b64decode(b64_data)
-                        
-                        import wave
-                        wav_path = output_audio.replace(".mp3", ".wav")
-                        with wave.open(wav_path, "wb") as wf:
-                            wf.setnchannels(1)
-                            wf.setsampwidth(2)
-                            wf.setframerate(24000)
-                            wf.writeframes(raw_pcm)
-                        print(f"Successfully generated Google Gemini TTS voiceover ({selected_voice}): {wav_path}")
-                        return wav_path
-        else:
-            print(f"  Gemini TTS Notice [{r.status_code}]: {r.text[:150]}")
-    except Exception as e:
-        print(f"  Gemini TTS Request Exception: {e}")
+
+    for attempt in range(3):
+        try:
+            r = requests.post(url, json=payload, timeout=45)
+            if r.status_code == 200:
+                data = r.json()
+                candidates = data.get("candidates", [])
+                if candidates:
+                    parts = candidates[0].get("content", {}).get("parts", [])
+                    for p in parts:
+                        if "inlineData" in p:
+                            b64_data = p["inlineData"]["data"]
+                            raw_pcm = base64.b64decode(b64_data)
+                            
+                            import wave
+                            wav_path = output_audio.replace(".mp3", ".wav")
+                            with wave.open(wav_path, "wb") as wf:
+                                wf.setnchannels(1)
+                                wf.setsampwidth(2)
+                                wf.setframerate(24000)
+                                wf.writeframes(raw_pcm)
+                            print(f"Successfully generated Google Gemini TTS voiceover ({selected_voice}): {wav_path}")
+                            return wav_path
+            else:
+                print(f"  Gemini TTS Notice [Attempt {attempt+1} - {r.status_code}]: {r.text[:150]}")
+        except Exception as e:
+            print(f"  Gemini TTS Request Exception [Attempt {attempt+1}]: {e}")
+        time.sleep(2.0)
         
     return None
+
 
 def format_text_for_spiritual_pace(quote_text):
     """
@@ -712,23 +716,7 @@ def generate_clause_image(clause_text, output_jpg, fallback_image_path=None):
             print(f"    [AI Image Gen] Pollinations attempt {attempt+1} note: {e}")
             time.sleep(2.0)
 
-    # 2. Tertiary: Free Atmospheric Stock Photo API Fallbacks (Unsplash/Picsum/LoremFlickr)
-    stock_urls = [
-        f"https://loremflickr.com/720/1280/nature,spiritual,fog,twilight/all?lock={seed}",
-        f"https://picsum.photos/720/1280?blur=1&random={seed}"
-    ]
 
-    for attempt, s_url in enumerate(stock_urls):
-        try:
-            print(f"    [Stock Image Gen] Trying atmospheric fallback {attempt+1}...")
-            r = requests.get(s_url, timeout=15, allow_redirects=True)
-            if r.status_code == 200 and len(r.content) > 5000:
-                with open(output_jpg, "wb") as f:
-                    f.write(r.content)
-                print(f"    ✅ Successfully fetched atmospheric fallback image!")
-                return output_jpg
-        except Exception as e:
-            print(f"    [Stock Image Gen] Fallback {attempt+1} note: {e}")
 
     # 3. Quaternary: Cascade from previous clause's generated image if available
     if fallback_image_path and os.path.exists(fallback_image_path) and os.path.getsize(fallback_image_path) > 5000:
