@@ -15,10 +15,13 @@ SETUP INSTRUCTIONS:
 """
 
 import os
+import sys
 import requests
 from dotenv import load_dotenv
 
+sys.stdout.reconfigure(encoding='utf-8')
 load_dotenv()
+
 
 
 def get_telegram_creds() -> tuple[str, str]:
