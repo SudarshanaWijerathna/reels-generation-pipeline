@@ -2,8 +2,9 @@ name: Reel Publisher (Facebook Post)
 
 on:
   schedule:
-    - cron: '0 7,17 * * *'  # Runs 2 times a day (7:00 AM & 5:00 PM UTC)
+    - cron: '0 1,13 * * *'  # 2 times a day optimized for US Audience: 9:00 AM EST & 9:00 PM EST (13:00 & 01:00 UTC)
   workflow_dispatch:        # Allows manual run from GitHub UI
+
 
 jobs:
   publish-reel:
