@@ -2,12 +2,14 @@ import sys
 import os
 import re
 import time
+import random
 import base64
 import urllib.parse
 import shutil
 import subprocess
 import requests
 import numpy as np
+
 from PIL import Image, ImageDraw, ImageFont
 
 # Hand-drawn boil animation subtitle system
