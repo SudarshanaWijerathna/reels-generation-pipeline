@@ -9,3 +9,5 @@ moviepy
 resvg-py
 fonttools
 gradio_client>=1.3.0
+openai-whisper
+
