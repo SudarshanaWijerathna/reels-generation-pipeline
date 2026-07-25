@@ -660,18 +660,22 @@ def generate_clause_image(clause_text, output_jpg):
     if os.path.exists(output_jpg) and os.path.getsize(output_jpg) > 5000:
         return output_jpg
 
-    # Primary: Pollinations FLUX Model (Native 1080x1920 vertical 9:16 format)
     clean_text = re.sub(r'[^\w\s]', '', clause_text)
     prompt = f"{clean_text}, {UNIFIED_STYLE}"
     encoded = urllib.parse.quote(prompt)
-    url = f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1920&model=flux&nologo=true"
+    seed = random.randint(1000, 99999)
     
     for attempt in range(4):
         try:
-            print(f"    Generating image via FLUX model (attempt {attempt+1})...")
-            model_param = "&model=flux" if attempt < 2 else ""
-            fetch_url = f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1920&nologo=true{model_param}"
-            r = requests.get(fetch_url, timeout=30)
+            print(f"    Generating image via Pollinations AI (attempt {attempt+1})...")
+            if attempt == 0:
+                fetch_url = f"https://image.pollinations.ai/prompt/{encoded}?width=720&height=1280&nologo=true&seed={seed}"
+            elif attempt == 1:
+                fetch_url = f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1920&nologo=true&seed={seed}"
+            else:
+                fetch_url = f"https://image.pollinations.ai/prompt/{encoded}?width=720&height=1280&seed={seed+1}"
+                
+            r = requests.get(fetch_url, timeout=25)
             if r.status_code == 200 and len(r.content) > 5000:
                 with open(output_jpg, "wb") as f:
                     f.write(r.content)
@@ -679,7 +683,8 @@ def generate_clause_image(clause_text, output_jpg):
                 return output_jpg
         except Exception as e:
             print(f"    Pollinations model attempt {attempt+1} notice: {e}")
-            time.sleep(1.5)
+            time.sleep(1.0)
+
 
     # Fallback: Generate dark atmospheric canvas so pipeline never crashes
     try:
@@ -906,7 +911,12 @@ def generate_full_reel(quote_text=DEFAULT_QUOTE, reuse_assets=False):
     if os.path.exists(bg_music_path):
         try:
             print(f"\nAdding Background Music ({os.path.basename(bg_music_path)})...")
-            from moviepy.audio.fx import AudioFadeOut, MultiplyVolume
+            try:
+                from moviepy.audio.fx.AudioFadeOut import AudioFadeOut
+                from moviepy.audio.fx.MultiplyVolume import MultiplyVolume
+            except ImportError:
+                from moviepy.audio.fx import AudioFadeOut, MultiplyVolume
+
             bg_music = AudioFileClip(bg_music_path)
             if bg_music.duration < final_video_duration:
                 from moviepy import concatenate_audioclips
@@ -914,12 +924,13 @@ def generate_full_reel(quote_text=DEFAULT_QUOTE, reuse_assets=False):
                 bg_music = concatenate_audioclips([bg_music] * n_loops)
             
             bg_music_sub = bg_music.subclipped(0, final_video_duration)
-            vol = getattr(cfg, "BG_MUSIC_VOLUME", 1.00)
+            vol = getattr(cfg, "BG_MUSIC_VOLUME", 0.35)
             fade = getattr(cfg, "BG_MUSIC_FADEOUT_SEC", 2.0)
             bg_audio_clip = bg_music_sub.with_effects([MultiplyVolume(vol), AudioFadeOut(fade)])
             print(f"  - Background music composited ({vol*100:.0f}% volume, {fade}s fadeout over {final_video_duration:.1f}s).")
         except Exception as e:
-            print(f"  - Background music note ({e}).")
+            print(f"  - Background music notice ({e}).")
+
 
     # Build Master Audio Stream
     voice_clip = AudioFileClip(master_audio_file)
@@ -957,13 +968,15 @@ def generate_full_reel(quote_text=DEFAULT_QUOTE, reuse_assets=False):
         visual_prompt = clause_to_prompt.get(text, text)
         if not (reuse_assets and os.path.exists(image_file)):
             print(f"  [Parallel Fetch] Generating Image {idx+1}/{len(segments)}...")
+            time.sleep(0.3 * (idx % 3))
             generate_clause_image(visual_prompt, image_file)
         else:
             print(f"  [Parallel Fetch] Reusing existing image {idx+1}/{len(segments)}")
 
     from concurrent.futures import ThreadPoolExecutor
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=2) as executor:
         list(executor.map(fetch_image_job, enumerate(segments)))
+
 
     # Build Synchronized Video Clips for Each Aligned Segment
     clips = []
