@@ -138,7 +138,8 @@ def _generate_via_gemini(prompt: str) -> str | None:
         }
     }
     try:
-        r = requests.post(url, json=payload, timeout=20)
+        r = requests.post(url, json=payload, timeout=45)
+
         if r.status_code == 200:
             data = r.json()
             candidates = data.get("candidates", [])

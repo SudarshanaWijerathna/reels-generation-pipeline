@@ -44,7 +44,8 @@ def run_producer():
         
         # 2. Render Full Reel Video
         voice_choice = random.choice(["Algenib", "Kore"])
-        output_mp4 = generate_full_reel(quote_text=quote_text, voice_preset=voice_choice, reuse_assets=False)
+        output_mp4 = generate_full_reel(quote_text=quote_text, reuse_assets=False)
+
         
         if output_mp4 and os.path.exists(output_mp4):
             # 3. Add to video_store buffer
