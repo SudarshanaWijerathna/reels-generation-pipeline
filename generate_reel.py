@@ -155,10 +155,9 @@ def generate_full_audio_gemini_tts(quote_text, output_audio, api_key):
     selected_voice = random.choice(voices)
     
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key={api_key}"
-    style_instruction = cfg.GEMINI_TTS_STYLE
-    
-    text_with_cues = format_text_with_bracket_cues(quote_text)
-    full_prompt = f"{style_instruction}:\n\n{text_with_cues}"
+    clean_quote = quote_text.strip()
+    full_prompt = f"{style_instruction}:\n\n{clean_quote}"
+
     
     payload = {
         "contents": [
@@ -450,7 +449,13 @@ def align_clauses_with_whisper(audio_mp3_path, clauses):
             
         print(f"  Whisper extracted {len(all_words)} words across {total_dur:.2f}s audio.")
         
+        # Audio Completeness Quality Gate: Verify narration audio contains full spoken quote
+        total_quote_words = sum(len(c["text"].split()) for c in clauses)
+        if len(all_words) < int(0.5 * total_quote_words):
+            raise RuntimeError(f"🚨 Quality Standard Gate Failed: Narration audio is truncated (Whisper recognized only {len(all_words)} of {total_quote_words} words). Cancelling pipeline run to ensure 100% voiceover quality.")
+
         # Match each clause to its starting word timestamp sequentially
+
         segments = []
         w_idx = 0
         
