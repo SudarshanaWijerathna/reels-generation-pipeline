@@ -8,7 +8,9 @@ sys.stdout.reconfigure(encoding='utf-8')
 
 ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
 
-samples_dir = r"c:\Users\User\Projects\video_generation_pipeline\output_reels\gemini_voice_samples"
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+samples_dir = os.path.join(_BASE_DIR, "output_reels", "gemini_voice_samples")
+
 
 print("Converting Gemini raw PCM bytes into playable WAV & MP3 files...")
 

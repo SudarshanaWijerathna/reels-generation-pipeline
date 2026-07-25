@@ -30,9 +30,10 @@ from moviepy import ImageClip, AudioFileClip, CompositeAudioClip, CompositeVideo
 
 sys.stdout.reconfigure(encoding='utf-8')
 
-WORKSPACE_DIR = r"c:\Users\User\Projects\video_generation_pipeline"
+WORKSPACE_DIR = os.path.dirname(os.path.abspath(__file__))
 OUTPUT_DIR = os.path.join(WORKSPACE_DIR, "output_reels")
 TEMP_DIR = os.path.join(WORKSPACE_DIR, "temp_build")
+
 
 # Output video resolution — 9:16 Full HD vertical format
 VIDEO_W = 1080

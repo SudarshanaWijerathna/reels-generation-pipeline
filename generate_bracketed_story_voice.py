@@ -28,8 +28,10 @@ voices_to_test = [
     ("Kore", "Serene soothing female")
 ]
 
-output_dir = r"c:\Users\User\Projects\video_generation_pipeline\output_reels\gemini_poetic_samples"
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+output_dir = os.path.join(_BASE_DIR, "output_reels", "gemini_poetic_samples")
 os.makedirs(output_dir, exist_ok=True)
+
 
 print("🎙️ Generating Poetic Storytelling Voices with Bracketed Breathing Cues...")
 print(f"Instruction: \"{prompt_instruction}\"")

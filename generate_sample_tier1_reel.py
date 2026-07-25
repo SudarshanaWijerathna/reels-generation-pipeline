@@ -2,7 +2,8 @@ import os
 import sys
 
 sys.stdout.reconfigure(encoding='utf-8')
-sys.path.insert(0, r"c:\Users\User\Projects\video_generation_pipeline")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 
 paid_api_key = os.getenv("GEMINI_API_KEY", "")
 if paid_api_key:

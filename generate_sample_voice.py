@@ -4,13 +4,14 @@ import requests
 import base64
 
 sys.stdout.reconfigure(encoding='utf-8')
-sys.path.insert(0, r"c:\Users\User\Projects\video_generation_pipeline")
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, _BASE_DIR)
 
 from dotenv import load_dotenv
-load_dotenv(r"c:\Users\User\Projects\video_generation_pipeline\.env")
+load_dotenv(os.path.join(_BASE_DIR, ".env"))
 
 VOICE_ID = "hpp4J3VqNfWAUOO0d1Us"
-API_KEY = os.environ.get("ELEVENLABS_API_KEY", "9127a2934475543838b3c08cf0511a4da65becddbac2a42dd80dbf81683c3bdf")
+API_KEY = os.environ.get("ELEVENLABS_API_KEY", "")
 
 quote_text = (
     "In the quietest moments of your life, when the world stops rushing, "
@@ -18,9 +19,10 @@ quote_text = (
     "Trust the journey, even when you cannot see the path ahead."
 )
 
-output_mp3 = r"c:\Users\User\Projects\video_generation_pipeline\output_reels\sample_storytelling_voice.mp3"
-output_wav = r"c:\Users\User\Projects\video_generation_pipeline\output_reels\sample_storytelling_voice.wav"
+output_mp3 = os.path.join(_BASE_DIR, "output_reels", "sample_storytelling_voice.mp3")
+output_wav = os.path.join(_BASE_DIR, "output_reels", "sample_storytelling_voice.wav")
 os.makedirs(os.path.dirname(output_mp3), exist_ok=True)
+
 
 print(f"Generating ElevenLabs storytelling voice sample...")
 print(f"Voice ID: {VOICE_ID}")
