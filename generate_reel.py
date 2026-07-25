@@ -485,26 +485,6 @@ def align_clauses_with_whisper(audio_mp3_path, clauses):
         
     return align_clauses_to_audio(audio_mp3_path, clauses)
 
-
-
-
-
-def align_clauses_to_audio(audio_mp3_path, clauses):
-    """Fallback simple energy split."""
-    y, sr = librosa.load(audio_mp3_path, sr=None)
-    total_dur = float(librosa.get_duration(y=y, sr=sr))
-    step = total_dur / len(clauses)
-    segments = []
-    for i, c in enumerate(clauses):
-        st = i * step
-        et = (i + 1) * step if i < len(clauses) - 1 else total_dur
-        segments.append({'text': c['text'], 'start': round(st, 3), 'end': round(et, 3), 'duration': round(et - st, 3)})
-    return segments, total_dur
-
-
-
-
-
 def align_clauses_to_audio(audio_mp3_path, clauses):
     """
     Fallback: Forced Alignment using Audio Energy (RMS) Silence Detection.
@@ -531,7 +511,8 @@ def align_clauses_to_audio(audio_mp3_path, clauses):
     silence_len = 0
     
     for i, speaking in enumerate(is_speech):
-        if not speaking:
+        spk_val = bool(speaking)
+        if not spk_val:
             in_silence = True
             silence_len += 1
         else:
@@ -540,8 +521,10 @@ def align_clauses_to_audio(audio_mp3_path, clauses):
             in_silence = False
             silence_len = 0
     
-    if is_speech[0] and (not onsets_frames or onsets_frames[0] > 5):
+    first_speech = bool(is_speech[0]) if len(is_speech) > 0 else False
+    if first_speech and (not onsets_frames or onsets_frames[0] > 5):
         onsets_frames.insert(0, 0)
+
     
     onset_times = librosa.frames_to_time(onsets_frames, sr=sr, hop_length=hop_length)
     
