@@ -4,8 +4,10 @@ import sys
 sys.stdout.reconfigure(encoding='utf-8')
 sys.path.insert(0, r"c:\Users\User\Projects\video_generation_pipeline")
 
-paid_api_key = "AIzaSyBC0qqCRmQWt3tttC2syE1RzHn8PFn9pe8"
-os.environ["GEMINI_API_KEY"] = paid_api_key
+paid_api_key = os.getenv("GEMINI_API_KEY", "")
+if paid_api_key:
+    os.environ["GEMINI_API_KEY"] = paid_api_key
+
 
 from generate_reel import generate_full_reel
 

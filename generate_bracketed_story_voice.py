@@ -9,7 +9,8 @@ import imageio_ffmpeg
 sys.stdout.reconfigure(encoding='utf-8')
 
 ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
-paid_api_key = "AIzaSyBC0qqCRmQWt3tttC2syE1RzHn8PFn9pe8"
+paid_api_key = os.getenv("GEMINI_API_KEY", "")
+
 
 prompt_instruction = "You have a bit calm, mind relaxing voice. Say the following in a bit poetic and story telling way"
 
