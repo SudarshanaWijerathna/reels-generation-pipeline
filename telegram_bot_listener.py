@@ -13,6 +13,10 @@ import os
 import sys
 import time
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 sys.stdout.reconfigure(encoding='utf-8')
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))

@@ -16,6 +16,10 @@ SETUP INSTRUCTIONS:
 
 import os
 import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+
 
 def get_telegram_creds() -> tuple[str, str]:
     token = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
