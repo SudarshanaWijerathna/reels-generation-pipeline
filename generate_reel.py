@@ -679,13 +679,8 @@ Return your response as a JSON array of strings, where each element is the image
 
 def generate_clause_image(clause_text, output_jpg, fallback_image_path=None):
     """
-    Bulletproof Multi-Provider AI Image Generator.
-    Guarantees 100% real visual images for every single clause.
-    Order of preference:
-      1. Pollinations AI (Primary - Prompted 9:16 Illustration)
-      2. Pollinations AI (Alternative URL format)
-      3. LoremFlickr / Unsplash / Picsum (Atmospheric nature/spiritual photography)
-      4. Previous Clause Image Cascade (Reuses last valid AI image with different camera crop)
+    AI Image Generator with Strict Quality Gate.
+    Raises RuntimeError if image generation fails, cancelling pipeline to prevent dark backgrounds.
     """
     if os.path.exists(output_jpg) and os.path.getsize(output_jpg) > 5000:
         return output_jpg
@@ -696,7 +691,6 @@ def generate_clause_image(clause_text, output_jpg, fallback_image_path=None):
     encoded = urllib.parse.quote(clean_prompt[:180])
     seed = random.randint(1000, 99999)
 
-    # 1. Primary & Secondary: Pollinations AI with Exponential Backoff
     pollinations_urls = [
         f"https://image.pollinations.ai/prompt/{encoded}?width=720&height=1280&nologo=true&seed={seed}",
         f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1920&nologo=true&seed={seed}",
@@ -716,32 +710,9 @@ def generate_clause_image(clause_text, output_jpg, fallback_image_path=None):
             print(f"    [AI Image Gen] Pollinations attempt {attempt+1} note: {e}")
             time.sleep(2.0)
 
+    # Strict Quality Standard Gate: Cancel pipeline if AI image generation fails
+    raise RuntimeError(f"🚨 Quality Standard Gate Failed: Pollinations AI failed to generate 90s anime image for clause '{clause_text}'. Cancelling pipeline run to ensure 100% visual quality.")
 
-
-    # 3. Quaternary: Cascade from previous clause's generated image if available
-    if fallback_image_path and os.path.exists(fallback_image_path) and os.path.getsize(fallback_image_path) > 5000:
-        try:
-            shutil.copy(fallback_image_path, output_jpg)
-            print(f"    ✅ [Cascade Fallback] Reused previous clause AI image for visual continuity.")
-            return output_jpg
-        except Exception as e:
-            print(f"    [Cascade Error]: {e}")
-
-    # 4. Ultimate Fallback: Dark Vignette Canvas (Emergency Only)
-    try:
-        from PIL import Image, ImageDraw
-        img = Image.new("RGB", (1080, 1920), color=(18, 22, 30))
-        draw = ImageDraw.Draw(img)
-        for y in range(1920):
-            r_c = int(24 * (1 - y / 1920))
-            g_c = int(28 * (1 - y / 1920))
-            b_c = int(36 * (1 - y / 1920))
-            draw.line([(0, y), (1080, y)], fill=(r_c, g_c, b_c))
-        img.save(output_jpg, "JPEG")
-        print(f"    [Emergency Fallback] Created dark canvas.")
-        return output_jpg
-    except Exception as err:
-        print(f"    [Emergency Error]: {err}")
 
     return None
 
@@ -910,10 +881,9 @@ def generate_full_reel(quote_text=DEFAULT_QUOTE, reuse_assets=False):
         if not audio_result and eleven_key:
             audio_result, alignment_data = generate_full_audio_elevenlabs(quote_text, master_audio_file, eleven_key)
             
-        # Fallback 3: Edge-TTS
-        if not audio_result:
-            print("Using Edge-TTS fallback...")
-            generate_full_audio_edgetts(quote_text, master_audio_file)
+        if not audio_result or not os.path.exists(master_audio_file):
+            raise RuntimeError("🚨 Quality Standard Gate Failed: Google Gemini TTS voiceover failed to generate. Cancelling pipeline run to ensure 100% voice quality.")
+
         
     clauses = parse_quote_into_clauses(quote_text)
     print(f"\nParsed {len(clauses)} clauses from quote.")
@@ -1008,10 +978,14 @@ def generate_full_reel(quote_text=DEFAULT_QUOTE, reuse_assets=False):
         visual_prompt = clause_to_prompt.get(text, text)
         if not (reuse_assets and os.path.exists(image_file)):
             print(f"  [Image Gen {idx+1}/{len(segments)}] Generating visual for: '{text[:40]}...'")
-            generate_clause_image(visual_prompt, image_file, fallback_image_path=prev_image_file)
+            generate_clause_image(visual_prompt, image_file)
             time.sleep(1.2)  # Gentle spacing to avoid rate limiting
         else:
             print(f"  [Image Gen {idx+1}/{len(segments)}] Reusing existing image.")
+
+        if not os.path.exists(image_file) or os.path.getsize(image_file) < 5000:
+            raise RuntimeError(f"🚨 Quality Standard Gate Failed: Image missing or invalid for segment {idx+1} ('{text[:30]}'). Cancelling pipeline run.")
+
 
 
 
