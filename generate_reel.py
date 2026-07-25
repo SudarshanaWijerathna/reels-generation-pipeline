@@ -1085,10 +1085,16 @@ def generate_full_reel(quote_text=DEFAULT_QUOTE, reuse_assets=False):
     if os.path.exists(noise_path):
         print(f"\nAdding Scratch & Dust overlay ({os.path.basename(noise_path)}) with Lighten blend mode...")
         try:
-            from moviepy import VideoFileClip, vfx
+            from moviepy import VideoFileClip
+            try:
+                from moviepy.video.fx.Rotate import Rotate
+            except ImportError:
+                from moviepy.video.fx import Rotate
+
             noise_clip = VideoFileClip(noise_path)
             # Rotate 90 degrees (1920x1080 -> 1080x1920 vertical format)
-            noise_clip = noise_clip.with_effects([vfx.Rotate(90)])
+            noise_clip = noise_clip.with_effects([Rotate(90)])
+
             # Loop/crop overlay to match full video duration
             if noise_clip.duration < final_video.duration:
                 n_repeats = int(np.ceil(final_video.duration / noise_clip.duration))
