@@ -147,16 +147,20 @@ def format_text_with_bracket_cues(text):
 
 def generate_full_audio_gemini_tts(quote_text, output_audio, api_key):
     """
-    Generates high quality poetic audio using Google Gemini TTS with random switching between 'Algenib' and 'Kore'.
+    Generates high quality expressive poetic audio using Google Gemini 3.1 Flash TTS.
     """
     import random
     
     voices = getattr(cfg, "GEMINI_TTS_VOICES", ["Algenib", "Kore"])
     selected_voice = random.choice(voices)
     
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key={api_key}"
-    clean_quote = quote_text.strip()
-    full_prompt = f"{style_instruction}:\n\n{clean_quote}"
+    # Official Gemini 3.1 Flash TTS model supporting expressive bracket tags ([soft breath], [sigh])
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent?key={api_key}"
+    style_instruction = cfg.GEMINI_TTS_STYLE
+    
+    text_with_cues = format_text_with_bracket_cues(quote_text)
+    full_prompt = f"{style_instruction}:\n\n{text_with_cues}"
+
 
     
     payload = {
