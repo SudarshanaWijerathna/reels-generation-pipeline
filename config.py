@@ -60,18 +60,24 @@ class PipelineConfig:
     )
 
     # ── TTS Voice Settings ─────────────────────────────────────────────────
-    GEMINI_TTS_VOICE:  str = "Algenib"
-    GEMINI_TTS_STYLE:  str = (
-        "Sensual Hypnosis - Sensual, Seductive, Gentle, Spiritual, Charming voice. "
-        "Suitable for ASMR, Guided Meditation and Hypnosis Inductions. "
-        "Self realizing tone, with breadth between clauses"
-    )
-    EDGE_TTS_VOICE:    str = "en-US-ChristopherNeural"
-    EDGE_TTS_RATE:     str = "-25%"
-    EDGE_TTS_PITCH:    str = "-6Hz"
+    PRIMARY_TTS_ENGINE: str  = "GEMINI"  # "GEMINI", "F5_TTS", "ELEVENLABS", "EDGE_TTS"
+    GEMINI_TTS_VOICES: list = ["Algenib", "Kore"]
+    GEMINI_TTS_VOICE:  str  = "Algenib"
+    GEMINI_TTS_STYLE:  str  = "You have a bit calm, mind relaxing voice. Say the following in a bit poetic and story telling way"
+    EDGE_TTS_VOICE:    str  = "en-US-ChristopherNeural"
+    EDGE_TTS_RATE:     str  = "-25%"
+    EDGE_TTS_PITCH:    str  = "-6Hz"
+
+    # ── F5-TTS Voice Cloning Settings ─────────────────────────────────────
+    F5_TTS_ENABLED:   bool  = False
+    F5_TTS_SPACE:     str   = "mrfakename/E2-F5-TTS"
+    F5_TTS_REF_DIR:   str   = str(_ROOT / "reference_voices")
+    F5_TTS_SPEED:     float = 0.9  # Deliberate, emotional storytelling pace
+    HF_TOKEN:         str   = _env("HF_TOKEN", "")
 
     # ── ElevenLabs Voice Priority ──────────────────────────────────────────
     ELEVENLABS_VOICES: list = [
+        ("hpp4J3VqNfWAUOO0d1Us", "Preferred Storytelling Voice (hpp4J3VqNfWAUOO0d1Us)"),
         ("PB6BdkFkZLbI39GHdnbQ", "User Selected Voice"),
         ("xrNwYO0xeioXswMCcFNF", "Ingmar - Intimately Mysterious"),
         ("N2lVS1w4EtoT3dr4eOWO", "Callum - Deep Breathy Husky Whisper"),

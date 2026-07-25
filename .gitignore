@@ -10,6 +10,7 @@ __pycache__/
 output_reels/
 temp_build/
 *.mp4
+!video_store/*.mp4
 *.mp3
 
 # Editor / system files

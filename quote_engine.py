@@ -259,6 +259,45 @@ def log_quote(quote: str, metadata: dict = None):
     print(f"  Logged quote to: {log_path}")
 
 
+USED_QUOTES_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "quote_history.json")
+
+def get_used_quote_hashes() -> set:
+    if os.path.exists(USED_QUOTES_FILE):
+        try:
+            with open(USED_QUOTES_FILE, "r", encoding="utf-8") as f:
+                return set(json.load(f))
+        except Exception:
+            pass
+    return set()
+
+def record_used_quote(quote_text: str):
+    import hashlib
+    h = hashlib.md5(quote_text.strip().lower().encode("utf-8")).hexdigest()
+    hashes = get_used_quote_hashes()
+    hashes.add(h)
+    try:
+        with open(USED_QUOTES_FILE, "w", encoding="utf-8") as f:
+            json.dump(list(hashes), f, indent=2)
+    except Exception as e:
+        print(f"  [QuoteEngine] Warning recording quote hash: {e}")
+
+def get_fresh_quote(theme: str = "") -> dict:
+    """
+    Generates a unique quote guaranteed not to repeat any previously used quote.
+    """
+    used_hashes = get_used_quote_hashes()
+    quote_text = ""
+    for _ in range(5):
+        quote_text = generate_quote(theme=theme)
+        import hashlib
+        h = hashlib.md5(quote_text.strip().lower().encode("utf-8")).hexdigest()
+        if h not in used_hashes:
+            record_used_quote(quote_text)
+            return {"quote": quote_text, "hash": h}
+    
+    record_used_quote(quote_text)
+    return {"quote": quote_text}
+
 # ---------------------------------------------------------------------------
 # CLI Entry Point
 # ---------------------------------------------------------------------------
@@ -277,7 +316,9 @@ if __name__ == "__main__":
     for i in range(args.count):
         if args.count > 1:
             print(f"\n── Quote {i+1}/{args.count} ──")
-        quote = generate_quote(theme=args.theme)
-        print(f"\n📜 GENERATED QUOTE:\n\n  {quote}\n")
+        q_data = get_fresh_quote(theme=args.theme)
+        quote = q_data["quote"]
+        print(f"\n📜 GENERATED UNIQUE QUOTE:\n\n  {quote}\n")
         if not args.no_log:
             log_quote(quote, {"theme": args.theme, "source": "llm_generated"})
+

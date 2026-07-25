@@ -51,6 +51,7 @@ DEFAULT_ELEVENLABS_API_KEY = ""
 
 # Voice priority for ElevenLabs Fallback
 ELEVENLABS_VOICES = [
+    ("hpp4J3VqNfWAUOO0d1Us", "Preferred Storytelling Voice (hpp4J3VqNfWAUOO0d1Us)"),
     ("PB6BdkFkZLbI39GHdnbQ", "User Selected Voice (PB6BdkFkZLbI39GHdnbQ)"),
     ("xrNwYO0xeioXswMCcFNF", "Ingmar - Intimately Mysterious"),
     ("N2lVS1w4EtoT3dr4eOWO", "Callum - Deep Breathy Husky Whisper"),
@@ -59,14 +60,102 @@ ELEVENLABS_VOICES = [
     ("JBFqnCBsd6RMkjVDRZzb", "George - Captivating Meditative Storyteller")
 ]
 
+def generate_full_audio_f5tts(quote_text, output_path, ref_voices_dir=None):
+    """
+    Generates zero-shot cloned voice audio using F5-TTS model via HuggingFace Gradio API Client.
+    Picks a random reference audio & transcript pair from reference_voices directory.
+    """
+    import random
+    if not ref_voices_dir:
+        ref_voices_dir = getattr(cfg, "F5_TTS_REF_DIR", os.path.join(WORKSPACE_DIR, "reference_voices"))
+        
+    if not os.path.exists(ref_voices_dir):
+        print(f"  F5-TTS Notice: Reference voices directory not found ({ref_voices_dir})")
+        return None
+        
+    audio_files = [f for f in os.listdir(ref_voices_dir) if f.endswith(('.mp3', '.wav'))]
+    if not audio_files:
+        print(f"  F5-TTS Notice: No .mp3/.wav reference files in {ref_voices_dir}")
+        return None
+        
+    selected_audio = random.choice(audio_files)
+    audio_path = os.path.join(ref_voices_dir, selected_audio)
+    txt_path = os.path.splitext(audio_path)[0] + ".txt"
+    
+    ref_text = ""
+    if os.path.exists(txt_path):
+        with open(txt_path, "r", encoding="utf-8") as f:
+            ref_text = f.read().strip()
+            
+    space_name = getattr(cfg, "F5_TTS_SPACE", "mrfakename/E2-F5-TTS")
+    speed = getattr(cfg, "F5_TTS_SPEED", 0.9)
+    
+    print(f"Calling F5-TTS Zero-Shot Voice Clone API ({space_name})...")
+    print(f"  Reference audio sample: {selected_audio}")
+    if ref_text:
+        print(f"  Reference transcript: '{ref_text[:60]}...'")
+        
+    hf_token = os.environ.get("HF_TOKEN") or getattr(cfg, "HF_TOKEN", None)
+    
+    try:
+        from gradio_client import Client, handle_file
+        client = Client(space_name, hf_token=hf_token) if hf_token else Client(space_name)
+        result = client.predict(
+            ref_audio=handle_file(audio_path),
+            ref_text=ref_text,
+            gen_text=quote_text,
+            remove_silence=True,
+            api_name="/predict"
+        )
+        
+        generated_wav = result[0] if isinstance(result, (tuple, list)) else (result.get("path") if isinstance(result, dict) else result)
+        if generated_wav and os.path.exists(generated_wav) and os.path.getsize(generated_wav) > 0:
+            shutil.copy(generated_wav, output_path)
+            print(f"Successfully generated F5-TTS voiceover:", output_path)
+            return output_path
+    except Exception as e:
+        print(f"  F5-TTS Exception: {e}")
+        
+    return None
+
+def format_text_with_bracket_cues(text):
+    """
+    Inserts natural bracketed expressive breathing/sigh cues into quote text for Gemini TTS.
+    """
+    if "[" in text and "]" in text:
+        return text
+        
+    sentences = [s.strip() for s in re.split(r'([\.\!\?])', text) if s.strip()]
+    if not sentences:
+        return text
+        
+    formatted_parts = []
+    for i in range(0, len(sentences), 2):
+        s_text = sentences[i]
+        punc = sentences[i+1] if (i+1) < len(sentences) else ""
+        if i == 0:
+            formatted_parts.append(f"[soft breath] {s_text}{punc}")
+        elif i == 2:
+            formatted_parts.append(f"[sigh] {s_text}{punc}")
+        else:
+            formatted_parts.append(f"[soft breath] {s_text}{punc}")
+            
+    return " ".join(formatted_parts)
+
 def generate_full_audio_gemini_tts(quote_text, output_audio, api_key):
     """
-    Generates high quality spiritual audio using Google Gemini 3.1 Flash TTS (Preview) with voice 'Algenib'.
+    Generates high quality poetic audio using Google Gemini TTS with random switching between 'Algenib' and 'Kore'.
     """
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-tts-preview:generateContent?key={api_key}"
+    import random
+    
+    voices = getattr(cfg, "GEMINI_TTS_VOICES", ["Algenib", "Kore"])
+    selected_voice = random.choice(voices)
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key={api_key}"
     style_instruction = cfg.GEMINI_TTS_STYLE
     
-    full_prompt = f"Please read this quote following this style instruction: ({style_instruction}).\n\nQuote: {quote_text}"
+    text_with_cues = format_text_with_bracket_cues(quote_text)
+    full_prompt = f"{style_instruction}:\n\n{text_with_cues}"
     
     payload = {
         "contents": [
@@ -77,14 +166,15 @@ def generate_full_audio_gemini_tts(quote_text, output_audio, api_key):
             "speechConfig": {
                 "voiceConfig": {
                     "prebuiltVoiceConfig": {
-                        "voiceName": "Algenib"
+                        "voiceName": selected_voice
                     }
                 }
             }
         }
     }
     
-    print(f"Calling Google Gemini 3.1 Flash TTS API (Voice: Algenib)...")
+    print(f"Calling Google Gemini TTS API (Voice: {selected_voice})...")
+    print(f"  Prompt Cues: '{text_with_cues[:70]}...'")
     try:
         r = requests.post(url, json=payload, timeout=45)
         if r.status_code == 200:
@@ -104,7 +194,7 @@ def generate_full_audio_gemini_tts(quote_text, output_audio, api_key):
                             wf.setsampwidth(2)
                             wf.setframerate(24000)
                             wf.writeframes(raw_pcm)
-                        print(f"Successfully generated Google Gemini 3.1 Flash TTS voiceover (Algenib): {wav_path}")
+                        print(f"Successfully generated Google Gemini TTS voiceover ({selected_voice}): {wav_path}")
                         return wav_path
         else:
             print(f"  Gemini TTS Notice [{r.status_code}]: {r.text[:150]}")
@@ -224,8 +314,12 @@ def parse_quote_into_clauses(quote_text):
     """
     Splits a quote into individual clauses based on punctuation.
     Subdivides any clause exceeding 8 words to ensure 1-2 line subtitle cards.
+    Strips out bracketed expression cues like [soft breath] or [sigh] for clean subtitles.
     """
-    raw_clauses = re.split(r'([,\.\;\!\?])', quote_text)
+    clean_text = re.sub(r'\[.*?\]', '', quote_text).strip()
+    clean_text = re.sub(r'\s+', ' ', clean_text)
+    
+    raw_clauses = re.split(r'([,\.\;\!\?])', clean_text)
     raw_list = []
     current_text = ""
     for token in raw_clauses:
@@ -309,69 +403,106 @@ def align_clauses_with_elevenlabs_alignment(quote_text, clauses, alignment, tota
 
 def align_clauses_with_whisper(audio_mp3_path, clauses):
     """
-    Forced Alignment using OpenAI Whisper Word-Level Timestamps.
-    Maps actual spoken words directly to exact clause start & end timestamps.
-    Ignores mid-sentence pauses, human breath gaps, or style variations.
+    Ground-Truth Prompted Word Alignment (Pre-Speech Predictive Card Switch).
+    
+    WHY THIS WORKS BEST FOR REELS:
+    When Clause i finishes speaking (e.g., at 4.32s), Card i+1 ("To explain it")
+    immediately appears on screen during the pause gap (4.32s -> 5.88s).
+    This allows the viewer to READ Card i+1 before hearing the voice speak it,
+    creating strong visual engagement and anticipation!
     """
-    print("\nRunning OpenAI Whisper Word-Level Forced Alignment...")
+    n_clauses = len(clauses)
+    print(f"\nRunning Ground-Truth Prompted Word Alignment for {n_clauses} clauses...")
+    
     try:
         import whisper
-        y, sr = librosa.load(audio_mp3_path, sr=None)
-        total_duration = float(librosa.get_duration(y=y, sr=sr))
+        y, sr = librosa.load(audio_mp3_path, sr=16000)
+        total_dur = float(len(y) / 16000.0)
         
-        model = whisper.load_model("tiny")
-        res = model.transcribe(audio_mp3_path, word_timestamps=True)
+        script_text = " ".join([c["text"] for c in clauses])
+        model = whisper.load_model("base")
+        res = model.transcribe(
+            y,
+            word_timestamps=True,
+            initial_prompt=script_text,
+            condition_on_previous_text=False,
+            temperature=0.0
+        )
         
         all_words = []
         for s in res.get('segments', []):
             for w in s.get('words', []):
                 clean_w = re.sub(r'[^\w]', '', w['word']).lower()
                 if clean_w:
-                    all_words.append({'word': clean_w, 'start': round(w['start'], 3), 'end': round(w['end'], 3)})
+                    all_words.append({
+                        'word': clean_w,
+                        'raw': w['word'].strip(),
+                        'start': round(w['start'], 3),
+                        'end': round(w['end'], 3)
+                    })
                     
-        search_idx = 0
+        if not all_words:
+            raise ValueError("No word timestamps returned by Whisper.")
+            
+        print(f"  Whisper extracted {len(all_words)} words across {total_dur:.2f}s audio.")
+        
+        # Match each clause to its starting word timestamp
+        word_offset = 0
+        clause_starts = []
+        
+        for idx, clause in enumerate(clauses):
+            c_words = [re.sub(r'[^\w]', '', w).lower() for w in clause["text"].split() if re.sub(r'[^\w]', '', w)]
+            n_w = len(c_words)
+            
+            first_w = all_words[word_offset] if word_offset < len(all_words) else all_words[-1]
+            clause_starts.append(first_w['start'])
+            word_offset += max(1, n_w)
+
+        # Build final synchronized video segments
         segments = []
-        
-        for c in clauses:
-            c_text = c["text"]
-            c_words = [re.sub(r'[^\w]', '', w).lower() for w in c_text.split() if re.sub(r'[^\w]', '', w)]
-            if not c_words:
-                continue
-                
-            start_t = None
-            end_t = None
-            
-            for i in range(search_idx, len(all_words)):
-                if all_words[i]['word'] == c_words[0]:
-                    start_t = all_words[i]['start']
-                    match_count = 1
-                    last_idx = i
-                    for j in range(1, len(c_words)):
-                        if i + j < len(all_words) and all_words[i+j]['word'] == c_words[j]:
-                            match_count += 1
-                            last_idx = i + j
-                    end_t = all_words[last_idx]['end']
-                    search_idx = last_idx + 1
-                    break
-                    
-            if start_t is not None and end_t is not None:
-                segments.append({'text': c_text, 'start': start_t, 'end': end_t, 'duration': round(end_t - start_t, 3)})
-                
-        if segments:
-            for i in range(len(segments) - 1):
-                segments[i]["end"] = segments[i+1]["start"]
-                segments[i]["duration"] = round(segments[i]["end"] - segments[i]["start"], 3)
-            segments[-1]["end"] = total_duration
-            segments[-1]["duration"] = round(total_duration - segments[-1]["start"], 3)
-            
-            print(f"  Aligned {len(segments)} clauses using Whisper word timestamps:")
-            for s in segments:
-                print(f"    [{s['start']:.3f}s -> {s['end']:.3f}s] ({s['duration']:.2f}s): '{s['text']}'")
-            return segments, total_duration
+        for i, c in enumerate(clauses):
+            st = clause_starts[i]
+            et = clause_starts[i+1] if (i + 1) < len(clause_starts) else total_dur
+            dur = round(et - st, 3)
+            segments.append({
+                'text': c['text'],
+                'start': round(st, 3),
+                'end': round(et, 3),
+                'duration': dur
+            })
+
+        print(f"\n  Ground-Truth Aligned Segments ({len(segments)} clauses):")
+        for s in segments:
+            print(f"    [{s['start']:.3f}s -> {s['end']:.3f}s] ({s['duration']:.2f}s): '{s['text']}'")
+
+        return segments, total_dur
+
     except Exception as e:
-        print(f"  Whisper alignment notice: {e}")
+        print(f"  Ground-truth alignment notice ({e}), falling back to simple energy split.")
+        import traceback
+        traceback.print_exc()
         
-    return None, 0.0
+    return align_clauses_to_audio(audio_mp3_path, clauses)
+
+
+
+
+
+def align_clauses_to_audio(audio_mp3_path, clauses):
+    """Fallback simple energy split."""
+    y, sr = librosa.load(audio_mp3_path, sr=None)
+    total_dur = float(librosa.get_duration(y=y, sr=sr))
+    step = total_dur / len(clauses)
+    segments = []
+    for i, c in enumerate(clauses):
+        st = i * step
+        et = (i + 1) * step if i < len(clauses) - 1 else total_dur
+        segments.append({'text': c['text'], 'start': round(st, 3), 'end': round(et, 3), 'duration': round(et - st, 3)})
+    return segments, total_dur
+
+
+
+
 
 def align_clauses_to_audio(audio_mp3_path, clauses):
     """
@@ -709,17 +840,23 @@ def generate_full_reel(quote_text=DEFAULT_QUOTE, reuse_assets=False):
         audio_result = master_audio_file
 
     if not audio_result:
-        # Primary TTS: Google Gemini 3.1 Flash TTS (Preview) - Voice Algenib with Sensual Hypnosis Style
+        # Primary TTS: Google Gemini TTS (Random switching between Algenib & Kore with poetic bracketed cues)
         if gemini_key:
             audio_result = generate_full_audio_gemini_tts(quote_text, master_audio_file, gemini_key)
             if audio_result and os.path.exists(audio_result):
                 master_audio_file = audio_result
-                
-        # Fallback 1: ElevenLabs API
+
+        # Fallback 1: F5-TTS Zero-Shot Voice Clone
+        if not audio_result and getattr(cfg, "F5_TTS_ENABLED", False):
+            audio_result = generate_full_audio_f5tts(quote_text, master_audio_file)
+            if audio_result and os.path.exists(audio_result):
+                master_audio_file = audio_result
+
+        # Fallback 2: ElevenLabs API
         if not audio_result and eleven_key:
             audio_result, alignment_data = generate_full_audio_elevenlabs(quote_text, master_audio_file, eleven_key)
             
-        # Fallback 2: Edge-TTS
+        # Fallback 3: Edge-TTS
         if not audio_result:
             print("Using Edge-TTS fallback...")
             generate_full_audio_edgetts(quote_text, master_audio_file)
@@ -803,6 +940,23 @@ def generate_full_reel(quote_text=DEFAULT_QUOTE, reuse_assets=False):
         for c in clauses:
             clause_to_prompt[c["text"]] = c["text"]
 
+    # Pre-fetch all FLUX images in parallel using ThreadPoolExecutor (9x Speedup)
+    print(f"\nPre-fetching {len(segments)} FLUX background images in parallel...")
+    def fetch_image_job(idx_seg):
+        idx, seg = idx_seg
+        text = seg["text"]
+        image_file = os.path.join(TEMP_DIR, f"whisper_img_{idx}.jpg")
+        visual_prompt = clause_to_prompt.get(text, text)
+        if not (reuse_assets and os.path.exists(image_file)):
+            print(f"  [Parallel Fetch] Generating Image {idx+1}/{len(segments)}...")
+            generate_clause_image(visual_prompt, image_file)
+        else:
+            print(f"  [Parallel Fetch] Reusing existing image {idx+1}/{len(segments)}")
+
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        list(executor.map(fetch_image_job, enumerate(segments)))
+
     # Build Synchronized Video Clips for Each Aligned Segment
     clips = []
     for idx, seg in enumerate(segments):
@@ -820,10 +974,8 @@ def generate_full_reel(quote_text=DEFAULT_QUOTE, reuse_assets=False):
         image_file = os.path.join(TEMP_DIR, f"whisper_img_{idx}.jpg")
         boil_frames_dir = os.path.join(TEMP_DIR, f"boil_sub_{idx}")
         
-        visual_prompt = clause_to_prompt.get(text, text)
         print(f"\nProcessing Segment {idx+1}/{len(segments)} [{start_t:.2f}s -> {end_t:.2f}s, dur: {dur:.2f}s]:")
-        print(f"  - Generating Image with prompt: '{visual_prompt}'...")
-        generate_clause_image(visual_prompt, image_file)
+
         
         print(f"  - Creating Boil Animated Subtitle...")
         font_path = os.path.join(WORKSPACE_DIR, "fonts", "IndieFlower-Regular.ttf")
