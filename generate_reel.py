@@ -686,17 +686,37 @@ def generate_clause_image(clause_text, output_jpg):
     for attempt in range(4):
         try:
             print(f"    Generating image via FLUX model (attempt {attempt+1})...")
-            r = requests.get(url, timeout=25)
-            if r.status_code == 200:
+            model_param = "&model=flux" if attempt < 2 else ""
+            fetch_url = f"https://image.pollinations.ai/prompt/{encoded}?width=1080&height=1920&nologo=true{model_param}"
+            r = requests.get(fetch_url, timeout=30)
+            if r.status_code == 200 and len(r.content) > 5000:
                 with open(output_jpg, "wb") as f:
                     f.write(r.content)
-                print(f"    Successfully generated image via FLUX model.")
+                print(f"    Successfully generated image via Pollinations AI.")
                 return output_jpg
         except Exception as e:
-            print(f"    FLUX model attempt {attempt+1} notice: {e}")
+            print(f"    Pollinations model attempt {attempt+1} notice: {e}")
             time.sleep(1.5)
+
+    # Fallback: Generate dark atmospheric canvas so pipeline never crashes
+    try:
+        from PIL import Image, ImageDraw
+        img = Image.new("RGB", (1080, 1920), color=(18, 22, 30))
+        draw = ImageDraw.Draw(img)
+        # Subtle dark vignette styling
+        for y in range(1920):
+            r_c = int(18 * (1 - y / 1920))
+            g_c = int(22 * (1 - y / 1920))
+            b_c = int(30 * (1 - y / 1920))
+            draw.line([(0, y), (1080, y)], fill=(r_c, g_c, b_c))
+        img.save(output_jpg, "JPEG")
+        print(f"    [Fallback] Created dark atmospheric background for segment image.")
+        return output_jpg
+    except Exception as err:
+        print(f"    [Fallback Error]: {err}")
             
     return None
+
 
 def create_cinematic_motion_clip(image_path, duration, output_size=(VIDEO_W, VIDEO_H), style_idx=0):
     """
@@ -708,7 +728,11 @@ def create_cinematic_motion_clip(image_path, duration, output_size=(VIDEO_W, VID
     import numpy as np
     from moviepy import VideoClip
 
+    if not os.path.exists(image_path) or os.path.getsize(image_path) == 0:
+        generate_clause_image("spiritual atmospheric background", image_path)
+
     pil_img = Image.open(image_path).convert("RGB")
+
     oversize_w = int(output_size[0] * 1.25)
     oversize_h = int(output_size[1] * 1.25)
     img_arr = np.array(pil_img.resize((oversize_w, oversize_h), Image.LANCZOS))
