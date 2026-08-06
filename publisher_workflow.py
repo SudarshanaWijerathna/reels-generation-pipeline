@@ -46,6 +46,10 @@ def run_publisher():
     quote = metadata.get("quote", "")
     caption = metadata.get("caption", quote)
     
+    # Ensure caption includes algorithmic hashtags and follower CTA
+    if "#reels" not in caption:
+        caption = f"{caption}\n\n👉 Follow @Midnight Whispers for daily deep thoughts & wisdom.\n\n#reels #facebookreels #midnightwhispers #philosophy #wisdom #quotes #motivation #mindset #deep"
+
     print(f"\n[Publisher] Popped oldest reel from buffer: {reel_id}")
     print(f"  - File: {mp4_path}")
     print(f"  - Created At: {metadata.get('created_at')}")
@@ -53,7 +57,7 @@ def run_publisher():
     
     print("\nPublishing Reel to Facebook Page...")
     try:
-        res = publish_facebook_reel(mp4_path, title="Spiritual Quote", description=caption)
+        res = publish_facebook_reel(mp4_path, title="Daily Wisdom • Midnight Whispers", description=caption)
         
         if res.get("success"):
             post_url = res.get("url", "")

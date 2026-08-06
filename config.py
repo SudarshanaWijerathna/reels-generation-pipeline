@@ -120,9 +120,9 @@ class PipelineConfig:
         "One openly, the other secretly. One walks beside you. The other walks behind you. "
         "Time will show you which one was which. But by then, the damage is done."
     )
-    DEFAULT_REEL_TITLE:       str = "Daily Wisdom • Whisprs"
-    DEFAULT_REEL_DESCRIPTION: str = "#shorts #philosophy #wisdom #quotes #motivation #mindset #deep"
-    DEFAULT_REEL_TAGS:        list = ["shorts", "philosophy", "wisdom", "quotes", "motivation", "mindset"]
+    DEFAULT_REEL_TITLE:       str = "Daily Wisdom • Midnight Whispers"
+    DEFAULT_REEL_DESCRIPTION: str = "👉 Follow @Midnight Whispers for daily deep thoughts & wisdom.\n\n#reels #facebookreels #midnightwhispers #philosophy #wisdom #quotes #motivation #mindset #deep"
+    DEFAULT_REEL_TAGS:        list = ["reels", "facebookreels", "midnightwhispers", "philosophy", "wisdom", "quotes", "motivation", "mindset"]
 
     def validate(self) -> dict:
         """Returns a dict of which API keys are present vs. missing."""
